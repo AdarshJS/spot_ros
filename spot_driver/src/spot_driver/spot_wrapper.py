@@ -12,6 +12,9 @@ from bosdyn.client.frame_helpers import get_odom_tform_body
 from bosdyn.client.power import safe_power_off, PowerClient, power_on
 from bosdyn.client.lease import LeaseClient, LeaseKeepAlive
 from bosdyn.client.image import ImageClient, build_image_request
+
+from bosdyn.api.spot import robot_command_pb2 as spot_command_pb2 # Newly added
+
 from bosdyn.api import image_pb2
 from bosdyn.api.graph_nav import graph_nav_pb2
 from bosdyn.api.graph_nav import map_pb2
@@ -216,6 +219,8 @@ class SpotWrapper():
         self._estop_timeout = estop_timeout
         self._keep_alive = True
         self._valid = True
+
+        self.disable_obs_avoidance = True # Newly added
 
         self._mobility_params = RobotCommandBuilder.mobility_params()
         self._is_standing = False
@@ -557,7 +562,7 @@ class SpotWrapper():
         """
         return self._mobility_params
 
-    def velocity_cmd(self, v_x, v_y, v_rot, cmd_duration=0.125):
+    def velocity_cmd(self, v_x, v_y, v_rot, cmd_duration=0.125): # TODO: Add a new argument for locomotion_hint
         """Send a velocity motion command to the robot.
 
         Args:
@@ -566,12 +571,43 @@ class SpotWrapper():
             v_rot: Angular velocity around the Z axis in radians
             cmd_duration: (optional) Time-to-live for the command in seconds.  Default is 125ms (assuming 10Hz command rate).
         """
+        print("Inside Velocity_cmd function in Wrapper!")
+
+        if(self.disable_obs_avoidance):
+            print("Obstacle Avoidance Disabled!")
+            
+            # Newly added
+            obstacles = spot_command_pb2.ObstacleParams(disable_vision_body_obstacle_avoidance=True,
+                                                        disable_vision_foot_obstacle_avoidance=True,
+                                                        disable_vision_foot_constraint_avoidance=True,
+                                                        obstacle_avoidance_padding=.001,
+                                                        disable_vision_foot_obstacle_body_assist=True,
+                                                        disable_vision_negative_obstacles=True)
+            # Newly added
+            mobility_params = spot_command_pb2.MobilityParams(
+                        obstacle_params=obstacles, locomotion_hint=spot_command_pb2.HINT_AUTO) # TODO: Set locomotion_hint according to arg
+
+        else:
+            mobility_params = self._mobility_params
+
         end_time=time.time() + cmd_duration
+        
+        # Original Statement
+        # response = self._robot_command(RobotCommandBuilder.synchro_velocity_command(
+        #                               v_x=v_x, v_y=v_y, v_rot=v_rot, params=self._mobility_params),
+        #                               end_time_secs=end_time, timesync_endpoint=self._robot.time_sync.endpoint)
+        
+        
+        # Passing our Mobility params with disabled obstacle avoidance
         response = self._robot_command(RobotCommandBuilder.synchro_velocity_command(
-                                      v_x=v_x, v_y=v_y, v_rot=v_rot, params=self._mobility_params),
+                                      v_x=v_x, v_y=v_y, v_rot=v_rot, params=mobility_params),
                                       end_time_secs=end_time, timesync_endpoint=self._robot.time_sync.endpoint)
         self._last_velocity_command_time = end_time
         return response[0], response[1]
+
+
+
+
 
     def trajectory_cmd(self, goal_x, goal_y, goal_heading, cmd_duration, frame_name='odom', precise_position=False):
         """Send a trajectory motion command to the robot.

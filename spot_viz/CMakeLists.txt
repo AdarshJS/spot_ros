@@ -19,6 +19,7 @@ endif()
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  /home/spotcore/catkin_ws/src/spot_ros/spot_msgs/srv
 )
 
 set(SRC_FILES

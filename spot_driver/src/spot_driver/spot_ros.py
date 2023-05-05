@@ -398,6 +398,9 @@ class SpotROS():
 
     def cmdVelCallback(self, data):
         """Callback for cmd_vel command"""
+
+        # Can send the locomotion hint as a part of cmd_vel (say data.angular.x)
+        # Modify velocity_cmd to accept another arg.
         self.spot_wrapper.velocity_cmd(data.linear.x, data.linear.y, data.angular.z)
 
     def bodyPoseCallback(self, data):
