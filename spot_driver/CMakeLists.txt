@@ -15,6 +15,7 @@ include_directories(
 
 catkin_install_python(PROGRAMS
     scripts/spot_ros
+    scripts/spot_ros_gait_change
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

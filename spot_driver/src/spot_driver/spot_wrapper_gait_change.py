@@ -222,7 +222,16 @@ class SpotWrapper():
 
         self.disable_obs_avoidance = True # Newly added
 
-        self._mobility_params = RobotCommandBuilder.mobility_params()
+        obstacles = spot_command_pb2.ObstacleParams(disable_vision_body_obstacle_avoidance=True,
+                                                        disable_vision_foot_obstacle_avoidance=True,
+                                                        disable_vision_foot_constraint_avoidance=True,
+                                                        obstacle_avoidance_padding=.001,
+                                                        disable_vision_foot_obstacle_body_assist=True,
+                                                        disable_vision_negative_obstacles=True)
+        mobility_params = spot_command_pb2.MobilityParams(obstacle_params=obstacles, locomotion_hint=spot_command_pb2.HINT_AUTO)
+
+        # self._mobility_params = RobotCommandBuilder.mobility_params() # default one
+        self._mobility_params = mobility_params # This switches off all obstacle avoidance
         self._is_standing = False
         self._is_sitting = True
         self._is_moving = False
@@ -562,19 +571,22 @@ class SpotWrapper():
         """
         return self._mobility_params
 
-    def velocity_cmd(self, v_x, v_y, v_rot, cmd_duration=0.125): # TODO: Add a new argument for locomotion_hint
+    def velocity_cmd(self, v_x, v_y, v_rot, loco_hint, cmd_duration=0.125): # TODO: Add a new argument for locomotion_hint
         """Send a velocity motion command to the robot.
 
         Args:
             v_x: Velocity in the X direction in meters
             v_y: Velocity in the Y direction in meters
             v_rot: Angular velocity around the Z axis in radians
+            loco_hint: 0-Auto, 1-Crawl, 2-Amble
             cmd_duration: (optional) Time-to-live for the command in seconds.  Default is 125ms (assuming 10Hz command rate).
         """
         print("Inside new Velocity_cmd function in Wrapper!")
 
+        print("Current locomotion hint from DWA", loco_hint)
+
         if(self.disable_obs_avoidance):
-            print("Obstacle Avoidance Disabled!")
+            print("Obstacle Avoidance Disabled in gait change wrapper!")
             
             # Newly added
             obstacles = spot_command_pb2.ObstacleParams(disable_vision_body_obstacle_avoidance=True,
@@ -584,10 +596,20 @@ class SpotWrapper():
                                                         disable_vision_foot_obstacle_body_assist=True,
                                                         disable_vision_negative_obstacles=True)
             # Newly added
-            mobility_params = spot_command_pb2.MobilityParams(
-                        obstacle_params=obstacles, locomotion_hint=spot_command_pb2.HINT_AUTO) # TODO: Set locomotion_hint according to arg
+            if (loco_hint == 0.0):
+                hint = spot_command_pb2.HINT_AUTO
+            elif (loco_hint == 1.0):
+                hint = spot_command_pb2.HINT_SPEED_SELECT_CRAWL
+            elif (loco_hint == 2.0):
+                hint = spot_command_pb2.HINT_SPEED_SELECT_AMBLE
+            else:
+                hint = spot_command_pb2.HINT_AUTO
+
+            print("Obstacles params: ",obstacles)
+            mobility_params = spot_command_pb2.MobilityParams(obstacle_params=obstacles, locomotion_hint=hint) # TODO: Set locomotion_hint according to arg
 
         else:
+            print("Obstacle Avoidance NOT disabled inside gait change wrapper.")
             mobility_params = self._mobility_params
 
         end_time=time.time() + cmd_duration
@@ -597,7 +619,7 @@ class SpotWrapper():
         #                               v_x=v_x, v_y=v_y, v_rot=v_rot, params=self._mobility_params),
         #                               end_time_secs=end_time, timesync_endpoint=self._robot.time_sync.endpoint)
         
-        
+        print("Mobility params: ",mobility_params)
         # Passing our Mobility params with disabled obstacle avoidance
         response = self._robot_command(RobotCommandBuilder.synchro_velocity_command(
                                       v_x=v_x, v_y=v_y, v_rot=v_rot, params=mobility_params),
